@@ -1,6 +1,6 @@
 # ============================================================
 # Vérifications automatiques : l'application rend-elle le service attendu ?
-# ============================================================
+# ========================S====================================
  
 from app import app
  
@@ -31,6 +31,14 @@ def test_liste_notes():
 def test_recherche_etudiant():
     reponse = client.get("/notes?etudiant=Amina")
     assert reponse.get_json()[0]["note"] == 15.5
+
 def test_version():
-    response = health()
-    assert response["version"] == "1.0"
+    client = app.test_client()
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "status": "ok",
+        "version": "1.0"
+    }
