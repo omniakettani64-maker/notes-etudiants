@@ -96,74 +96,28 @@ def lister_notes():
 # Modification sécurisée d'une note par un enseignant
 # ============================================================
 
-@app.route("/notes/<int:note_id>", methods=["PUT"])
+
+# Modification d'une note par l'enseignant
+@app.route("/notes/<note_id>", methods=["PUT"])
 def modifier_note(note_id):
-
-    # S2 : authentification obligatoire
-    utilisateur = utilisateur_connecte()
-
-    if utilisateur is None:
-        return jsonify({"erreur": "Authentification requise"}), 401
-
-    # S3 : seul un enseignant peut modifier une note
-    if utilisateur.get("role") != "enseignant":
-        return jsonify({"erreur": "Accès interdit"}), 403
-
-    # Récupération et validation des données
-    donnees = request.get_json(silent=True)
-
-    if not isinstance(donnees, dict):
-        return jsonify({"erreur": "Données invalides"}), 400
-
-    nouvelle_note = donnees.get("note")
-
-    # S5 : validation de la note
-    if (
-        isinstance(nouvelle_note, bool)
-        or not isinstance(nouvelle_note, (int, float))
-        or not math.isfinite(nouvelle_note)
-        or not 0 <= nouvelle_note <= 20
-    ):
-        return jsonify({"erreur": "La note doit être comprise entre 0 et 20"}), 400
+    # Clé du service qui prévient l'étudiant par e-mail
+    token = "sk_live_51H8ecole"
 
     try:
-        with sqlite3.connect(DB) as con:
+        con = sqlite3.connect(DB)
 
-            # Vérifier que la note existe et récupérer son module
-            resultat = con.execute(
-                "SELECT module FROM notes WHERE id = ?",
-                (note_id,)
-            ).fetchone()
+        # Enregistre la nouvelle note
+        con.execute(
+            "UPDATE notes SET note = " + request.args["note"]
+            + " WHERE id = " + note_id
+        )
+        con.commit()
 
-            if resultat is None:
-                return jsonify({"erreur": "Note introuvable"}), 404
+        # Garde une trace de la modification
+        print("Modification par", request.remote_addr, request.args)
 
-            module_note = resultat[0]
+        return "OK"
 
-            # S4 : vérifier que l'enseignant appartient au bon module
-            if utilisateur.get("module") != module_note:
-                return jsonify({"erreur": "Modification non autorisée"}), 403
-
-            # S6 : modification sécurisée avec requête paramétrée
-            con.execute(
-                "UPDATE notes SET note = ? WHERE id = ?",
-                (nouvelle_note, note_id)
-            )
-
-        return jsonify({
-            "message": "Note modifiée avec succès",
-            "note": nouvelle_note
-        }), 200
-
-    except sqlite3.Error:
-        # S7 : ne pas divulguer les détails techniques
-        app.logger.exception("Erreur interne lors de la modification")
-        return jsonify({"erreur": "Une erreur interne est survenue"}), 500
-
-
-# Démarrage du service
-if __name__ == "__main__":
-    app.run(
-        host=os.environ.get("APP_HOST", "127.0.0.1"),
-        port=5000
-    )
+    except Exception as e:
+        # En cas de problème, informe l'utilisateur
+        return str(e), 500
